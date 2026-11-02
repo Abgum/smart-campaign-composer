@@ -1,3 +1,5 @@
+# Claude Export denedim ancak belli bir tarhiten öncesi için otomatik compact yapmış bu yüzden exportum yarım oldu dosya olarak görebilirsiniz de. Bu şekidle claudenin proje dosyalşarında .jsonl olarak export alıp onu formatlayıp bu dosyayı oluşturdum.
+
 # Claude Code sohbeti — tam döküm
 
 ### Sen · 2026-10-26 11:22
