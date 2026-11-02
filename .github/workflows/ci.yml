@@ -1,0 +1,36 @@
+# Every push and pull request runs the same containers as a developer's
+# machine: `make lint` (gofmt, go vet, this workflow) and `make test` (Go with
+# -race against Postgres, vitest and vue-tsc). Neither needs Go, Node or an
+# API key on the runner: the LLM tests use the mock and fixtures, so this
+# workflow reads no secret.
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: Format and static checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: gofmt, go vet, workflow lint
+        run: make lint
+
+  test:
+    name: Tests (Go, vitest, vue-tsc)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Backend and frontend tests in containers, no API key
+        run: make test

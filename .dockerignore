@@ -1,0 +1,8 @@
+.git
+.env
+local-data
+**/node_modules
+frontend/dist
+**/*.test
+**/*.out
+**/.DS_Store

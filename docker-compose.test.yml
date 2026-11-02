@@ -1,0 +1,56 @@
+# Test containers. A project name of their own keeps "down --remove-orphans"
+# after a test run away from the app's containers (docker-compose.yml).
+name: smart-campaign-composer-test
+
+services:
+  postgres-test:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_PASSWORD: test
+      POSTGRES_DB: scc_test
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d scc_test"]
+      interval: 1s
+      timeout: 3s
+      retries: 30
+
+  backend-test:
+    image: golang:1.26.10-bookworm
+    working_dir: /src/backend
+    volumes:
+      - ./backend:/src/backend
+      - go-mod-cache:/go/pkg/mod
+      - go-build-cache:/root/.cache/go-build
+    environment:
+      TEST_DATABASE_URL: postgres://postgres:test@postgres-test:5432/scc_test?sslmode=disable
+      REQUIRE_DB: "1"
+      CGO_ENABLED: "1"
+    command: ["go", "test", "-race", "-count=1", "./..."]
+    depends_on:
+      postgres-test:
+        condition: service_healthy
+
+  frontend-test:
+    image: node:22.12.0-alpine
+    working_dir: /src/frontend
+    volumes:
+      - ./frontend:/src/frontend
+      - node-modules:/src/frontend/node_modules
+      - npm-cache:/root/.npm
+    command: ["sh", "-c", "npm ci --no-audit --no-fund --loglevel=error && npx vue-tsc --noEmit && npm test"]
+
+volumes:
+  go-mod-cache:
+    name: scc-go-mod-cache
+    external: true
+  go-build-cache:
+    name: scc-go-build-cache
+    external: true
+  node-modules:
+    name: scc-node-modules
+    external: true
+  npm-cache:
+    name: scc-npm-cache
+    external: true

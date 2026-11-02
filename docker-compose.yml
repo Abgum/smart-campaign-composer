@@ -1,0 +1,125 @@
+# The whole app: docker compose up --build (or make up), then open
+# http://localhost:8080. Without ANTHROPIC_API_KEY the demo model answers,
+# and the UI says so. Nobody real is ever contacted: the recipients are
+# fake and the provider is the mock.
+name: smart-campaign-composer
+
+x-app: &app
+  build: .
+  image: smart-campaign-composer:local
+  environment: &app-env
+    DATABASE_URL: postgres://scc:scc@postgres:5432/scc?sslmode=disable
+    LOG_LEVEL: ${LOG_LEVEL:-info}
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: scc
+      POSTGRES_PASSWORD: scc
+      POSTGRES_DB: scc
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U scc -d scc"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  migrate:
+    <<: *app
+    command: ["migrate"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  seed:
+    <<: *app
+    command: ["seed"]
+    environment:
+      <<: *app-env
+      SEED_USERS: ${SEED_USERS:-5000}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: "no"
+
+  api:
+    <<: *app
+    command: ["api"]
+    environment:
+      <<: *app-env
+      HTTP_ADDR: ":8080"
+      LLM_PROVIDER: ${LLM_PROVIDER:-auto}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      LLM_MODEL: ${LLM_MODEL:-claude-opus-5-5}
+      LLM_EFFORT: ${LLM_EFFORT:-medium}
+      LLM_ROUTER_MODEL: ${LLM_ROUTER_MODEL:-}
+      LLM_ROUTER_EFFORT: ${LLM_ROUTER_EFFORT:-low}
+      APP_TIMEZONE: ${APP_TIMEZONE:-Europe/Istanbul}
+    ports:
+      - "8080:8080"
+    depends_on:
+      seed:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "/app", "probe", "http://127.0.0.1:8080/readyz"]
+      interval: 5s
+      timeout: 4s
+      retries: 20
+    # Running turns finish and store their result before the API exits: it
+    # waits for them up to TURN_TIMEOUT (120s) plus 15s, and Docker kills it
+    # when this period ends. Raise both together.
+    stop_grace_period: 150s
+    restart: unless-stopped
+
+  worker:
+    <<: *app
+    command: ["worker"]
+    environment:
+      <<: *app-env
+      PROVIDER_URL: http://mockprovider:8090
+      WORKER_METRICS_ADDR: ":9091"
+      SMS_RATE_PER_SECOND: ${SMS_RATE_PER_SECOND:-100}
+      EMAIL_RATE_PER_SECOND: ${EMAIL_RATE_PER_SECOND:-100}
+    ports:
+      - "9091:9091"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      mockprovider:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "/app", "probe", "http://127.0.0.1:9091/healthz"]
+      interval: 5s
+      timeout: 4s
+      retries: 20
+    # Calls already made are recorded before the worker exits.
+    stop_grace_period: 30s
+    restart: unless-stopped
+
+  mockprovider:
+    <<: *app
+    command: ["mockprovider"]
+    environment:
+      MOCKPROVIDER_ADDR: ":8090"
+      MOCKPROVIDER_LOG: /data/acceptances.jsonl
+      MOCKPROVIDER_FAULTS: ${MOCKPROVIDER_FAULTS-reject_429=0.02,fail_503=0.01,accept_then_503=0.01,accept_then_drop=0.005,delay=0.01}
+      MOCKPROVIDER_DELAY: ${MOCKPROVIDER_DELAY:-200ms}
+      MOCKPROVIDER_SEED: ${MOCKPROVIDER_SEED:-1}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    volumes:
+      - mockprovider-data:/data
+    ports:
+      - "8090:8090"
+    healthcheck:
+      test: ["CMD", "/app", "probe", "http://127.0.0.1:8090/stats"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  mockprovider-data:
