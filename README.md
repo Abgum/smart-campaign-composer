@@ -42,6 +42,7 @@ The same image provides the `api`, `worker`, `mockprovider`, `migrate`, `seed`, 
 The frontend uses Vue 3 and TypeScript. The API and worker are written in Go, and PostgreSQL 17 stores both application data and the delivery queue. The Claude adapter uses `anthropic-sdk-go/v2`. Select the model with `LLM_MODEL` (default: `claude-opus-5-5`). The LLM can propose drafts; it cannot approve or send campaigns.
 
 ```mermaid
+
 sequenceDiagram
     actor UI as Marketer / Vue UI
     participant API as Backend API
@@ -51,48 +52,55 @@ sequenceDiagram
     participant MP as Mock provider
 
     rect rgba(108, 92, 231, 0.12)
-    Note over UI,DB: 1. Create or edit a draft
-    alt Conversational request
-        UI->>API: POST /api/chats/{id}/turns
-        API->>LLM: Route intent and campaign target
-        LLM-->>API: route_request proposal
-        API->>LLM: Request draft
-        LLM-->>API: save_campaign_draft or remove_ab_test
-        API->>API: Validate target, rule, content, and version
-        opt Invalid draft
-            API-->>LLM: Validation errors for repair
+        Note over UI,DB: 1. Create or edit a draft
+        alt Conversational request
+            UI->>API: POST chat turns
+            API->>LLM: Route intent and campaign target
+            LLM-->>API: Route proposal
+            API->>LLM: Request draft
+            LLM-->>API: Draft proposal
+            API->>API: Validate target and content
+            opt Invalid draft
+                API-->>LLM: Validation errors
+            end
+        else Manual form
+            UI->>API: POST campaign
+            API->>API: Validate draft
         end
-    else Manual form
-        UI->>API: POST /api/campaigns or /api/campaigns/{id}/versions
-        API->>API: Apply the same draft validation
-    end
-    API->>DB: Save a new draft version and count the audience
-    API-->>UI: Draft and live preview (SSE for chat)
+        API->>DB: Save draft version
+        API->>DB: Count audience
+        API-->>UI: Draft and live preview
     end
 
     rect rgba(42, 120, 214, 0.12)
-    Note over UI,DB: 2. Human approval - no LLM call
-    UI->>API: POST /api/campaigns/{id}/approve
-    API->>DB: Lock version; revalidate and select recipients
-    API->>DB: Check consent, render, deduplicate, queue deliveries
-    API-->>UI: Selected and excluded counts
+        Note over UI,DB: 2. Human approval without LLM
+        UI->>API: POST approve
+        API->>DB: Lock campaign version
+        API->>DB: Revalidate draft
+        API->>DB: Select recipients
+        API->>DB: Check consent
+        API->>DB: Render messages
+        API->>DB: Deduplicate deliveries
+        API->>DB: Queue deliveries
+        API-->>UI: Selected and excluded counts
     end
 
     rect rgba(12, 163, 12, 0.12)
-    Note over UI,MP: 3. Worker sends without calling the LLM
-    loop Per channel, for due deliveries
-        W->>DB: Claim with FOR UPDATE SKIP LOCKED
-        W->>DB: Recheck consent and obtain shared rate grant
-        opt Recipient is reachable
-            W->>MP: POST /v1/messages with Idempotency-Key
-            MP-->>W: HTTP response or timeout
-            W->>DB: Classify and store delivery outcome
+        Note over UI,MP: 3. Worker sends without LLM
+        loop Per channel and due deliveries
+            W->>DB: Claim delivery
+            W->>DB: Recheck consent and rate limit
+            opt Recipient is reachable
+                W->>MP: POST mock message
+                MP-->>W: HTTP response or timeout
+                W->>DB: Store delivery outcome
+            end
         end
+        UI->>API: GET dashboard stream
+        API->>DB: Read current counts
+        API-->>UI: Live status through SSE
     end
-    UI->>API: GET /api/dashboard/stream
-    API->>DB: Read current counts
-    API-->>UI: Live status (SSE)
-    end
+
 ```
 
 The conversational flow has seven steps:
