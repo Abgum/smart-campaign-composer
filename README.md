@@ -71,7 +71,7 @@ sequenceDiagram
     end
 
     rect rgba(42, 120, 214, 0.12)
-    Note over UI,DB: 2. Human approval; no LLM call
+    Note over UI,DB: 2. Human approval - no LLM call
     UI->>API: POST /api/campaigns/{id}/approve
     API->>DB: Lock version; revalidate and select recipients
     API->>DB: Check consent, render, deduplicate, queue deliveries
