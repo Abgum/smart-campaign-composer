@@ -284,4 +284,4 @@ This document explains the main design choices. [README](README.md) covers setup
 
 **Alternatives.** `setup-go` and `setup-node` could simplify caching but introduce another toolchain configuration. More linters are possible.
 
-**Trade-offs and limits.** Pulling images adds runtime; there is no dedicated cache. Backend checks include gofmt and go vet, but not staticcheck. ESLint and Prettier are not configured. The workflow has not run on GitHub yet because this repository has no commit; it was checked locally with actionlint and the same make targets.
+**Trade-offs and limits.** Pulling images adds runtime; there is no dedicated cache. Backend checks include gofmt and go vet, but not staticcheck. ESLint and Prettier are not configured. The committed workflow was checked locally with actionlint and the same make targets.

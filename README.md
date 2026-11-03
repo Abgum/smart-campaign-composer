@@ -144,7 +144,7 @@ An `unknown` outcome retains the deduplication claim because the provider may ha
   - An approved scheduled campaign can be canceled before its send time while no delivery has started. Cancellation removes its pending deliveries and releases their duplicate-content claims. Rescheduling is not available. Its audience is frozen at approval; at send time only consent and contact details are rechecked.
   - A/B allocation is approximately 50/50 and supports only two arms. There is no winner selection or conversion metric; delivery outcomes are shown per arm, but Prometheus metrics are not split by arm.
   - Only `remove_ab_test` can remove an A/B test through chat. The model interprets the user's intent; the backend checks the target, version, and existing test.
-  - The CI workflow has been checked locally with actionlint and the same `make` targets, but has not run on GitHub because the repository has no commit yet.
+  - The committed CI workflow uses the same `make lint` and `make test` targets as local development and was checked locally with actionlint. It requires no Claude API key.
 
 ## Demo scenarios
 
