@@ -27,7 +27,7 @@ This document explains the main design choices. [README](README.md) covers setup
 - The application maintains its own loop, retry policy, and error classification.
 - Context is a selected projection, not a full transcript: the last six turns as text (about 6,000 tokens) and the current versions of at most three target campaigns. Campaign history and the list of campaigns are included in `<chat_state>` in the latest user message, allowing the system prompt to stay stable and cacheable (`cache_control`).
 - Earlier turns' thinking and tool blocks are not replayed. Within a turn, thinking blocks are returned unchanged.
-- Raw requests and responses are stored in `llm_calls` for inspection, but are not fed back into prompts.
+- `llm_calls` stores call metadata (provider, model, stop reason, token counts, latency, and error code), but the existing `request` and `response` columns are not populated. Raw model requests and responses cannot currently be inspected from this table or replayed into later prompts.
 
 ### 2. The router proposes a target; the backend limits writes
 
